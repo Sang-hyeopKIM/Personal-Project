@@ -2,25 +2,28 @@
 """항공권 특가 알리미 - 메인 실행 파일
 
 사용법:
-    python main.py                  # 1회 검색 실행
-    python main.py --schedule       # 주기적 자동 검색 실행
-    python main.py --best-deals     # 지금까지의 최저가 목록 조회
+    python main.py                  # 1회 검색 (설정된 데이터 소스 사용)
+    python main.py --source kiwi    # Kiwi API로 검색
+    python main.py --source amadeus # Amadeus API로 검색
+    python main.py --links          # 검색 링크만 생성 (API 호출 없음)
+    python main.py --schedule       # 주기적 자동 검색
+    python main.py --best-deals     # 최저가 목록 조회
 """
 
 import argparse
 import logging
 import sys
 import time
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 
-import schedule
+import schedule as schedule_lib
 import yaml
 
-from flight_checker import FlightChecker
 from models import Passenger, PriceAlert, SearchPeriod, SearchRoute
 from notifier import ConsoleNotifier, EmailNotifier, TelegramNotifier
 from price_tracker import PriceTracker
+from search_links import generate_all_links
 
 CONFIG_PATH = Path(__file__).parent / "config.yaml"
 
@@ -49,7 +52,6 @@ def load_config(path: Path = CONFIG_PATH) -> dict:
 
 
 def build_routes(config: dict) -> list[SearchRoute]:
-    """설정에서 검색 노선 목록을 생성합니다."""
     return [
         SearchRoute(
             origin=r["origin"],
@@ -61,7 +63,6 @@ def build_routes(config: dict) -> list[SearchRoute]:
 
 
 def build_periods(config: dict) -> list[SearchPeriod]:
-    """설정에서 검색 기간 목록을 생성합니다."""
     return [
         SearchPeriod(
             departure_start=date.fromisoformat(p["departure_start"]),
@@ -73,8 +74,15 @@ def build_periods(config: dict) -> list[SearchPeriod]:
     ]
 
 
+def build_passengers(config: dict) -> Passenger:
+    return Passenger(
+        adults=config.get("passengers", {}).get("adults", 2),
+        children=config.get("passengers", {}).get("children", 2),
+        infants=config.get("passengers", {}).get("infants", 0),
+    )
+
+
 def build_alerts(config: dict, routes: list[SearchRoute]) -> list[PriceAlert]:
-    """설정에서 알림 기준을 생성합니다."""
     alerts_cfg = config.get("alerts", {})
     alerts = []
     for route in routes:
@@ -89,14 +97,9 @@ def build_alerts(config: dict, routes: list[SearchRoute]) -> list[PriceAlert]:
 
 
 def build_notifiers(config: dict) -> list:
-    """설정에서 알림 채널을 생성합니다."""
-    notifiers = []
+    notifiers = [ConsoleNotifier()]
     notifier_cfg = config.get("notifications", {})
 
-    # 콘솔 알림은 항상 활성화
-    notifiers.append(ConsoleNotifier())
-
-    # 이메일 알림
     email_cfg = notifier_cfg.get("email", {})
     if email_cfg.get("enabled"):
         notifiers.append(EmailNotifier(
@@ -110,7 +113,6 @@ def build_notifiers(config: dict) -> list:
         ))
         logger.info("이메일 알림 활성화")
 
-    # 텔레그램 알림
     telegram_cfg = notifier_cfg.get("telegram", {})
     if telegram_cfg.get("enabled"):
         notifiers.append(TelegramNotifier(
@@ -122,21 +124,34 @@ def build_notifiers(config: dict) -> list:
     return notifiers
 
 
-def run_search(config: dict):
+def create_checker(config: dict, source: str):
+    """설정된 데이터 소스에 맞는 checker를 생성합니다."""
+    if source == "kiwi":
+        from kiwi_checker import KiwiChecker
+        kiwi_cfg = config.get("kiwi_api", {})
+        api_key = kiwi_cfg.get("api_key", "")
+        if not api_key or api_key.startswith("YOUR_"):
+            logger.error("Kiwi API 키가 설정되지 않았습니다. config.yaml의 kiwi_api.api_key를 확인하세요.")
+            sys.exit(1)
+        return KiwiChecker(api_key=api_key)
+    else:
+        from flight_checker import FlightChecker
+        api_cfg = config.get("amadeus_api", {})
+        api_key = api_cfg.get("api_key", "")
+        if not api_key or api_key.startswith("YOUR_"):
+            logger.error("Amadeus API 키가 설정되지 않았습니다. config.yaml의 amadeus_api를 확인하세요.")
+            sys.exit(1)
+        return FlightChecker(
+            api_key=api_key,
+            api_secret=api_cfg["api_secret"],
+            test_mode=api_cfg.get("test_mode", True),
+        )
+
+
+def run_search(config: dict, source: str = "amadeus"):
     """1회 검색을 실행합니다."""
-    api_cfg = config["amadeus_api"]
-    checker = FlightChecker(
-        api_key=api_cfg["api_key"],
-        api_secret=api_cfg["api_secret"],
-        test_mode=api_cfg.get("test_mode", True),
-    )
-
-    passengers = Passenger(
-        adults=config.get("passengers", {}).get("adults", 2),
-        children=config.get("passengers", {}).get("children", 2),
-        infants=config.get("passengers", {}).get("infants", 0),
-    )
-
+    checker = create_checker(config, source)
+    passengers = build_passengers(config)
     routes = build_routes(config)
     periods = build_periods(config)
     alerts = build_alerts(config, routes)
@@ -149,8 +164,8 @@ def run_search(config: dict):
     max_results = search_cfg.get("max_results_per_search", 3)
 
     logger.info(
-        "검색 시작: %d개 노선, %d개 기간, 탑승객 %d명 (성인%d 아동%d)",
-        len(routes), len(periods), passengers.total,
+        "검색 시작 [%s]: %d개 노선, %d개 기간, 탑승객 %d명 (성인%d 아동%d)",
+        source.upper(), len(routes), len(periods), passengers.total,
         passengers.adults, passengers.children,
     )
 
@@ -177,10 +192,8 @@ def run_search(config: dict):
                 logger.info("검색 결과 없음")
                 continue
 
-            # 가격 이력 저장
             tracker.save_offers(offers)
 
-            # 알림 기준 확인
             alert = alert_map.get(route.destination)
             cheap_offers = []
             has_new_low = False
@@ -197,21 +210,18 @@ def run_search(config: dict):
 
             if cheap_offers:
                 logger.info(
-                    "🎉 특가 %d건 발견! (역대 최저가: %s)",
+                    "특가 %d건 발견! (역대 최저가: %s)",
                     len(cheap_offers), "예" if has_new_low else "아니오",
                 )
                 for notifier in notifiers:
                     notifier.send_flight_alert(cheap_offers, has_new_low)
             else:
-                # 특가는 아니지만 최저가 Top 3는 콘솔에 표시
                 top3 = offers[:3]
-                logger.info(
-                    "특가 기준 미달이지만 최저가 Top 3:"
-                )
+                logger.info("특가 기준 미달, 최저가 Top 3:")
                 for offer in top3:
                     logger.info("  %s", offer.summary())
 
-    # 검색 완료 후 통계 출력
+    # 통계 출력
     print("\n📊 노선별 가격 통계:")
     for route in routes:
         stats = tracker.get_stats(route.origin, route.destination)
@@ -225,8 +235,19 @@ def run_search(config: dict):
             )
 
 
+def show_links(config: dict):
+    """검색 링크를 생성하여 출력합니다."""
+    routes = build_routes(config)
+    periods = build_periods(config)
+    passengers = build_passengers(config)
+    sample_interval = config.get("search_options", {}).get("sample_interval_days", 7)
+
+    output = generate_all_links(routes, periods, passengers, sample_interval)
+    print(output)
+
+
 def show_best_deals(config: dict):
-    """지금까지 수집된 최저가 목록을 표시합니다."""
+    """수집된 최저가 목록을 표시합니다."""
     routes = build_routes(config)
     tracker = PriceTracker()
 
@@ -252,11 +273,19 @@ def show_best_deals(config: dict):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="항공권 특가 알리미 ✈️ - 동남아/일본 항공권 가격 모니터링"
+        description="항공권 특가 알리미 - 동남아/일본 항공권 가격 모니터링"
+    )
+    parser.add_argument(
+        "--source", choices=["amadeus", "kiwi"], default="amadeus",
+        help="데이터 소스 선택 (기본: amadeus)",
+    )
+    parser.add_argument(
+        "--links", action="store_true",
+        help="검색 링크 생성 (API 호출 없이 네이버/구글/스카이스캐너 링크 출력)",
     )
     parser.add_argument(
         "--schedule", action="store_true",
-        help="주기적 자동 검색 모드로 실행",
+        help="주기적 자동 검색 모드",
     )
     parser.add_argument(
         "--best-deals", action="store_true",
@@ -270,6 +299,10 @@ def main():
 
     config = load_config(Path(args.config))
 
+    if args.links:
+        show_links(config)
+        return
+
     if args.best_deals:
         show_best_deals(config)
         return
@@ -277,20 +310,16 @@ def main():
     if args.schedule:
         interval = config.get("schedule", {}).get("interval_hours", 6)
         logger.info("자동 검색 모드 시작 (간격: %d시간)", interval)
-
-        # 시작 시 1회 실행
-        run_search(config)
-
-        schedule.every(interval).hours.do(run_search, config)
-
+        run_search(config, args.source)
+        schedule_lib.every(interval).hours.do(run_search, config, args.source)
         try:
             while True:
-                schedule.run_pending()
+                schedule_lib.run_pending()
                 time.sleep(60)
         except KeyboardInterrupt:
             logger.info("자동 검색 종료")
     else:
-        run_search(config)
+        run_search(config, args.source)
 
 
 if __name__ == "__main__":

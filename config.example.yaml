@@ -1,0 +1,152 @@
+# ============================================
+# 항공권 특가 알리미 설정 파일
+# ============================================
+# 이 파일을 config.yaml로 복사한 뒤 API 키 등을 입력하세요.
+# cp config.example.yaml config.yaml
+
+# -------------------------------------------
+# Amadeus API 설정
+# 가입: https://developers.amadeus.com/
+# 무료 티어: 월 500회 API 호출
+# -------------------------------------------
+amadeus_api:
+  api_key: "YOUR_AMADEUS_API_KEY"
+  api_secret: "YOUR_AMADEUS_API_SECRET"
+  test_mode: true  # true: 테스트환경(무료), false: 프로덕션
+
+# -------------------------------------------
+# 탑승객 정보
+# -------------------------------------------
+passengers:
+  adults: 2       # 성인 (만 12세 이상)
+  children: 2     # 아동 (만 2~11세) - 10살, 6살
+  infants: 0      # 유아 (만 2세 미만)
+
+# -------------------------------------------
+# 검색 노선
+# origin: 출발 공항 코드
+# destination: 도착 공항 코드
+# name: 표시용 한글명
+# -------------------------------------------
+routes:
+  # 일본
+  - origin: ICN
+    destination: NRT
+    name: "도쿄 나리타"
+  - origin: ICN
+    destination: KIX
+    name: "오사카 간사이"
+  - origin: ICN
+    destination: FUK
+    name: "후쿠오카"
+
+  # 베트남
+  - origin: ICN
+    destination: DAD
+    name: "다낭"
+  - origin: ICN
+    destination: HAN
+    name: "하노이"
+  - origin: ICN
+    destination: SGN
+    name: "호치민"
+
+  # 기타 동남아 (필요시 주석 해제)
+  # - origin: ICN
+  #   destination: BKK
+  #   name: "방콕"
+  # - origin: ICN
+  #   destination: CEB
+  #   name: "세부"
+
+# -------------------------------------------
+# 검색 기간 설정
+# 여러 기간을 설정하면 각각 검색합니다.
+# -------------------------------------------
+periods:
+  # 여름 방학 (7~8월)
+  - departure_start: "2026-07-15"
+    departure_end: "2026-08-15"
+    min_stay_days: 3
+    max_stay_days: 6
+
+  # 추석 연휴 (9~10월)
+  - departure_start: "2026-09-20"
+    departure_end: "2026-10-10"
+    min_stay_days: 3
+    max_stay_days: 5
+
+  # 가을 (10~11월)
+  - departure_start: "2026-10-15"
+    departure_end: "2026-11-15"
+    min_stay_days: 3
+    max_stay_days: 5
+
+# -------------------------------------------
+# 검색 옵션
+# -------------------------------------------
+search_options:
+  nonstop_only: false          # true: 직항만, false: 경유 포함
+  sample_interval_days: 3      # 출발일 검색 간격 (API 호출 절약)
+  max_results_per_search: 3    # 날짜 조합당 최대 결과 수
+
+# -------------------------------------------
+# 알림 가격 기준 (KRW)
+# 이 금액 이하면 알림을 보냅니다.
+# -------------------------------------------
+alerts:
+  # 노선별 개별 설정 (도착 공항 코드)
+  NRT:
+    threshold_total: 2000000       # 4인 총액 200만원 이하
+    threshold_per_person: 500000   # 1인 50만원 이하
+  KIX:
+    threshold_total: 1800000
+    threshold_per_person: 450000
+  FUK:
+    threshold_total: 1600000
+    threshold_per_person: 400000
+  DAD:
+    threshold_total: 2400000
+    threshold_per_person: 600000
+  HAN:
+    threshold_total: 2400000
+    threshold_per_person: 600000
+  SGN:
+    threshold_total: 2400000
+    threshold_per_person: 600000
+
+  # 개별 설정이 없는 노선의 기본값
+  default:
+    threshold_total: 2000000
+    threshold_per_person: 500000
+
+# -------------------------------------------
+# 알림 설정
+# -------------------------------------------
+notifications:
+  # 이메일 알림 (Gmail 예시)
+  email:
+    enabled: false
+    smtp_host: "smtp.gmail.com"
+    smtp_port: 587
+    username: "your-email@gmail.com"
+    password: "your-app-password"    # Gmail 앱 비밀번호
+    sender: "your-email@gmail.com"
+    recipients:
+      - "your-email@gmail.com"
+      - "spouse-email@gmail.com"
+    use_tls: true
+
+  # 텔레그램 봇 알림
+  # 봇 생성: https://t.me/BotFather
+  # Chat ID 확인: https://t.me/userinfobot
+  telegram:
+    enabled: false
+    bot_token: "YOUR_TELEGRAM_BOT_TOKEN"
+    chat_id: "YOUR_CHAT_ID"
+
+# -------------------------------------------
+# 자동 실행 스케줄
+# -------------------------------------------
+schedule:
+  interval_hours: 6  # 검색 주기 (시간)

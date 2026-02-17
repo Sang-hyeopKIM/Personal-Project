@@ -8,6 +8,7 @@
     python main.py --links          # 검색 링크만 생성 (API 호출 없음)
     python main.py --schedule       # 주기적 자동 검색
     python main.py --best-deals     # 최저가 목록 조회
+    python main.py --dashboard      # 웹 대시보드 실행
 """
 
 import argparse
@@ -292,12 +293,25 @@ def main():
         help="수집된 최저가 목록 조회",
     )
     parser.add_argument(
+        "--dashboard", action="store_true",
+        help="웹 대시보드 실행 (기본 포트: 5000)",
+    )
+    parser.add_argument(
+        "--port", type=int, default=5000,
+        help="대시보드 포트 번호 (기본: 5000)",
+    )
+    parser.add_argument(
         "--config", type=str, default=str(CONFIG_PATH),
         help="설정 파일 경로 (기본: config.yaml)",
     )
     args = parser.parse_args()
 
     config = load_config(Path(args.config))
+
+    if args.dashboard:
+        from dashboard import run_dashboard
+        run_dashboard(port=args.port)
+        return
 
     if args.links:
         show_links(config)

@@ -211,3 +211,64 @@ class PriceTracker:
             "avg_price": round(row[2]),
             "total_records": row[3],
         }
+
+    def get_price_trend(
+        self, origin: str, destination: str, limit: int = 200
+    ) -> list[dict]:
+        """노선별 가격 추이 데이터를 조회합니다 (차트용)."""
+        with sqlite3.connect(self.db_path) as conn:
+            rows = conn.execute("""
+                SELECT checked_at, MIN(price) as min_price,
+                       AVG(price) as avg_price, COUNT(*) as cnt
+                FROM price_history
+                WHERE origin = ? AND destination = ?
+                GROUP BY date(checked_at)
+                ORDER BY checked_at ASC
+                LIMIT ?
+            """, (origin, destination, limit)).fetchall()
+
+        return [
+            {
+                "date": r[0][:10],
+                "min_price": r[1],
+                "avg_price": round(r[2]),
+                "count": r[3],
+            }
+            for r in rows
+        ]
+
+    def get_all_routes(self) -> list[dict]:
+        """DB에 저장된 모든 노선 목록을 조회합니다."""
+        with sqlite3.connect(self.db_path) as conn:
+            rows = conn.execute("""
+                SELECT DISTINCT origin, destination
+                FROM price_history
+                ORDER BY destination
+            """).fetchall()
+        return [{"origin": r[0], "destination": r[1]} for r in rows]
+
+    def get_recent_searches(self, limit: int = 50) -> list[dict]:
+        """최근 검색 결과를 조회합니다."""
+        with sqlite3.connect(self.db_path) as conn:
+            rows = conn.execute("""
+                SELECT origin, destination, departure_date, return_date,
+                       price, currency, carrier, is_direct, checked_at
+                FROM price_history
+                ORDER BY checked_at DESC
+                LIMIT ?
+            """, (limit,)).fetchall()
+
+        return [
+            {
+                "origin": r[0],
+                "destination": r[1],
+                "departure_date": r[2],
+                "return_date": r[3],
+                "price": r[4],
+                "currency": r[5],
+                "carrier": r[6] or "-",
+                "is_direct": bool(r[7]),
+                "checked_at": r[8],
+            }
+            for r in rows
+        ]

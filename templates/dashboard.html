@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>항공권 특가 알리미 - 대시보드</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+            background: #f0f2f5;
+            color: #1a1a2e;
+            line-height: 1.6;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 24px 32px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+        }
+        .header h1 { font-size: 24px; font-weight: 700; }
+        .header p { font-size: 14px; opacity: 0.85; margin-top: 4px; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
+
+        /* 요약 카드 행 */
+        .summary-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .summary-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        }
+        .summary-card .value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #667eea;
+        }
+        .summary-card .label {
+            font-size: 13px;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        /* 노선 카드 그리드 */
+        .route-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .route-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+        .route-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+        }
+        .route-card .route-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .route-card .route-name {
+            font-size: 18px;
+            font-weight: 700;
+        }
+        .route-card .route-code {
+            font-size: 13px;
+            color: #888;
+            background: #f0f2f5;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        .route-card .price-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid #f0f2f5;
+            font-size: 14px;
+        }
+        .route-card .price-row:last-child { border-bottom: none; }
+        .route-card .price-row .price-label { color: #888; }
+        .route-card .price-row .price-value { font-weight: 600; }
+        .price-min { color: #10b981; }
+        .price-avg { color: #f59e0b; }
+        .price-max { color: #ef4444; }
+        .price-threshold { color: #667eea; }
+
+        .route-card .mini-chart {
+            margin-top: 12px;
+            height: 80px;
+        }
+        .no-data {
+            color: #aaa;
+            text-align: center;
+            padding: 20px 0;
+            font-size: 14px;
+        }
+
+        /* 최근 검색 섹션 */
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            padding-left: 4px;
+        }
+        .recent-table {
+            width: 100%;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            border-collapse: collapse;
+        }
+        .recent-table thead { background: #f8f9fa; }
+        .recent-table th, .recent-table td {
+            padding: 10px 14px;
+            text-align: left;
+            font-size: 13px;
+            border-bottom: 1px solid #f0f2f5;
+        }
+        .recent-table th {
+            font-weight: 600;
+            color: #555;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge-direct { background: #d1fae5; color: #065f46; }
+        .badge-stopover { background: #fef3c7; color: #92400e; }
+
+        .footer {
+            text-align: center;
+            color: #aaa;
+            font-size: 12px;
+            padding: 24px 0;
+        }
+
+        @media (max-width: 640px) {
+            .route-grid { grid-template-columns: 1fr; }
+            .container { padding: 16px 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>항공권 특가 알리미</h1>
+        <p>4인 가족 (성인 2 + 아동 2) 왕복 기준 가격 모니터링</p>
+    </div>
+
+    <div class="container">
+        <!-- 요약 통계 -->
+        {% set total_records = route_stats | map(attribute='stats') | selectattr('total_records', 'defined') | map(attribute='total_records') | list %}
+        {% set ns = namespace(total=0, min_price=0, routes_with_data=0) %}
+        {% for rs in route_stats %}
+            {% if rs.stats %}
+                {% set ns.total = ns.total + rs.stats.total_records %}
+                {% set ns.routes_with_data = ns.routes_with_data + 1 %}
+                {% if ns.min_price == 0 or rs.stats.min_price < ns.min_price %}
+                    {% set ns.min_price = rs.stats.min_price %}
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+
+        <div class="summary-row">
+            <div class="summary-card">
+                <div class="value">{{ route_stats | length }}</div>
+                <div class="label">모니터링 노선</div>
+            </div>
+            <div class="summary-card">
+                <div class="value">{{ ns.routes_with_data }}</div>
+                <div class="label">데이터 수집 완료</div>
+            </div>
+            <div class="summary-card">
+                <div class="value">{{ "{:,}".format(ns.total) }}</div>
+                <div class="label">총 검색 기록</div>
+            </div>
+            <div class="summary-card">
+                <div class="value">{% if ns.min_price > 0 %}{{ "{:,.0f}".format(ns.min_price) }}{% else %}-{% endif %}</div>
+                <div class="label">전체 최저가 (KRW)</div>
+            </div>
+        </div>
+
+        <!-- 노선별 카드 -->
+        <div class="section-title">노선별 현황</div>
+        <div class="route-grid">
+            {% for rs in route_stats %}
+            <a class="route-card" href="/route/{{ rs.origin }}/{{ rs.destination }}">
+                <div class="route-header">
+                    <span class="route-name">{{ rs.name }}</span>
+                    <span class="route-code">{{ rs.origin }} → {{ rs.destination }}</span>
+                </div>
+                {% if rs.stats %}
+                <div class="price-row">
+                    <span class="price-label">최저가</span>
+                    <span class="price-value price-min">{{ "{:,.0f}".format(rs.stats.min_price) }} KRW</span>
+                </div>
+                <div class="price-row">
+                    <span class="price-label">평균</span>
+                    <span class="price-value price-avg">{{ "{:,.0f}".format(rs.stats.avg_price) }} KRW</span>
+                </div>
+                <div class="price-row">
+                    <span class="price-label">최고가</span>
+                    <span class="price-value price-max">{{ "{:,.0f}".format(rs.stats.max_price) }} KRW</span>
+                </div>
+                <div class="price-row">
+                    <span class="price-label">알림 기준</span>
+                    <span class="price-value price-threshold">{{ "{:,.0f}".format(rs.threshold_total) }} KRW</span>
+                </div>
+                <div class="price-row">
+                    <span class="price-label">검색 기록</span>
+                    <span class="price-value">{{ rs.stats.total_records }}건</span>
+                </div>
+                <canvas class="mini-chart" id="chart-{{ rs.destination }}"></canvas>
+                {% else %}
+                <div class="no-data">아직 수집된 데이터가 없습니다.<br>검색을 실행하면 여기에 통계가 표시됩니다.</div>
+                {% endif %}
+            </a>
+            {% endfor %}
+        </div>
+
+        <!-- 최근 검색 결과 -->
+        <div class="section-title">최근 검색 결과</div>
+        <div style="overflow-x: auto;">
+            <table class="recent-table" id="recent-table">
+                <thead>
+                    <tr>
+                        <th>목적지</th>
+                        <th>출발일</th>
+                        <th>귀국일</th>
+                        <th>항공사</th>
+                        <th>유형</th>
+                        <th>총액 (4인)</th>
+                        <th>조회시각</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="7" class="no-data">로딩 중...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="footer">
+        항공권 특가 알리미 &middot; 가격은 조회 시점 기준이며 변동될 수 있습니다.
+    </div>
+
+    <script>
+        // 미니 차트 렌더링
+        const routes = {{ route_stats | tojson }};
+
+        routes.forEach(rs => {
+            if (!rs.stats) return;
+            const canvas = document.getElementById('chart-' + rs.destination);
+            if (!canvas) return;
+
+            fetch('/api/trend/' + rs.origin + '/' + rs.destination)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.length === 0) return;
+                    new Chart(canvas, {
+                        type: 'line',
+                        data: {
+                            labels: data.map(d => d.date),
+                            datasets: [{
+                                data: data.map(d => d.min_price),
+                                borderColor: '#667eea',
+                                backgroundColor: 'rgba(102,126,234,0.1)',
+                                fill: true,
+                                tension: 0.3,
+                                pointRadius: 2,
+                                borderWidth: 2,
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                x: { display: false },
+                                y: {
+                                    display: false,
+                                    beginAtZero: false,
+                                }
+                            },
+                            interaction: { enabled: false },
+                        }
+                    });
+                });
+        });
+
+        // 최근 검색 결과 로드
+        fetch('/api/recent')
+            .then(r => r.json())
+            .then(data => {
+                const tbody = document.querySelector('#recent-table tbody');
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="no-data">검색 기록이 없습니다.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = data.map(r => `
+                    <tr>
+                        <td><strong>${r.dest_name || r.destination}</strong></td>
+                        <td>${r.departure_date}</td>
+                        <td>${r.return_date}</td>
+                        <td>${r.carrier}</td>
+                        <td><span class="badge ${r.is_direct ? 'badge-direct' : 'badge-stopover'}">${r.is_direct ? '직항' : '경유'}</span></td>
+                        <td style="font-weight:600;">${Number(r.price).toLocaleString()} ${r.currency}</td>
+                        <td style="color:#888;font-size:12px;">${r.checked_at ? r.checked_at.slice(0, 16).replace('T', ' ') : '-'}</td>
+                    </tr>
+                `).join('');
+            });
+    </script>
+</body>
+</html>

@@ -1,5 +1,6 @@
 # LG 트윈스 AI 분석 에이전트 설정 파일
 # 이 파일을 baseball_config.yaml로 복사한 후 API 키를 설정하세요.
+# cp baseball_config.example.yaml baseball_config.yaml
 
 # Anthropic API 키 (또는 ANTHROPIC_API_KEY 환경변수 사용)
 anthropic_api_key: "your-api-key-here"
@@ -20,3 +21,13 @@ language: "ko"
 data_sources:
   statiz_base_url: "https://statiz.sporki.com"
   kbo_base_url: "https://www.koreabaseball.com"
+
+# -------------------------------------------
+# 텔레그램 알림 설정
+# 봇 생성: https://t.me/BotFather
+# Chat ID 확인: https://t.me/userinfobot
+# -------------------------------------------
+telegram:
+  enabled: false
+  bot_token: "YOUR_TELEGRAM_BOT_TOKEN"
+  chat_id: "YOUR_CHAT_ID"

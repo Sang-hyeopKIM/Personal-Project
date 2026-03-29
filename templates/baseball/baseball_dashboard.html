@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LG 트윈스 AI 분석 대시보드</title>
+    <style>
+        :root {
+            --lg-red: #C60C30;
+            --lg-dark: #1a1a2e;
+            --lg-navy: #16213e;
+            --lg-blue: #0f3460;
+            --accent: #e94560;
+            --bg: #0a0a1a;
+            --card-bg: #16213e;
+            --text: #eee;
+            --text-dim: #8892b0;
+            --border: #233554;
+            --success: #64ffda;
+            --warning: #ffd93d;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', 'Noto Sans KR', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* 헤더 */
+        .header {
+            background: linear-gradient(135deg, var(--lg-dark), var(--lg-red));
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--lg-red);
+        }
+        .header h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+        }
+        .header h1 span { color: var(--lg-red); }
+        .header-actions { display: flex; gap: 0.8rem; }
+        .btn {
+            padding: 0.5rem 1.2rem;
+            border: 1px solid var(--border);
+            background: var(--card-bg);
+            color: var(--text);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+        .btn:hover { background: var(--lg-blue); border-color: var(--accent); }
+        .btn-primary { background: var(--lg-red); border-color: var(--lg-red); }
+        .btn-primary:hover { background: #a00a28; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* 레이아웃 */
+        .container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+
+        /* 팀 요약 카드 */
+        .team-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.2rem;
+            text-align: center;
+        }
+        .stat-card .label { color: var(--text-dim); font-size: 0.8rem; margin-bottom: 0.4rem; }
+        .stat-card .value { font-size: 2rem; font-weight: 700; color: var(--success); }
+        .stat-card .value.rank { color: var(--warning); }
+        .stat-card .value.red { color: var(--lg-red); }
+
+        /* 탭 네비게이션 */
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 0;
+            overflow-x: auto;
+        }
+        .tab {
+            padding: 0.7rem 1.5rem;
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 0.9rem;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .tab:hover { color: var(--text); }
+        .tab.active { color: var(--lg-red); border-bottom-color: var(--lg-red); font-weight: 600; }
+
+        /* 탭 콘텐츠 */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* 테이블 */
+        .data-table-wrapper {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        .data-table th {
+            background: var(--lg-navy);
+            color: var(--text-dim);
+            padding: 0.8rem 1rem;
+            text-align: center;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            cursor: pointer;
+        }
+        .data-table th:hover { color: var(--success); }
+        .data-table td {
+            padding: 0.7rem 1rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+        .data-table tr:hover td { background: rgba(100, 255, 218, 0.05); }
+        .data-table .player-name { text-align: left; font-weight: 600; }
+        .data-table .highlight { color: var(--success); font-weight: 700; }
+
+        /* OPS 바 */
+        .ops-bar {
+            display: inline-block;
+            height: 6px;
+            background: var(--success);
+            border-radius: 3px;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+        }
+
+        /* AI 분석 패널 */
+        .analysis-panel {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .analysis-panel h3 {
+            color: var(--lg-red);
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+        .analysis-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 0.8rem;
+            margin-bottom: 1.5rem;
+        }
+        .analysis-btn {
+            padding: 1rem;
+            background: var(--lg-navy);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.2s;
+        }
+        .analysis-btn:hover { border-color: var(--lg-red); transform: translateY(-2px); }
+        .analysis-btn .icon { font-size: 1.4rem; margin-bottom: 0.4rem; }
+        .analysis-btn .title { font-weight: 600; font-size: 0.95rem; }
+        .analysis-btn .desc { color: var(--text-dim); font-size: 0.78rem; margin-top: 0.3rem; }
+
+        .analysis-result {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            min-height: 100px;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            font-size: 0.9rem;
+        }
+        .analysis-result.loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-dim);
+        }
+
+        /* 채팅 */
+        .chat-section {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem;
+        }
+        .chat-section h3 { color: var(--lg-red); margin-bottom: 1rem; }
+        .chat-messages {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            height: 350px;
+            overflow-y: auto;
+            margin-bottom: 1rem;
+        }
+        .chat-msg {
+            margin-bottom: 1rem;
+            line-height: 1.7;
+        }
+        .chat-msg.user { text-align: right; }
+        .chat-msg .bubble {
+            display: inline-block;
+            max-width: 80%;
+            padding: 0.7rem 1rem;
+            border-radius: 12px;
+            font-size: 0.88rem;
+            white-space: pre-wrap;
+        }
+        .chat-msg.user .bubble {
+            background: var(--lg-red);
+            border-bottom-right-radius: 4px;
+        }
+        .chat-msg.assistant .bubble {
+            background: var(--lg-navy);
+            border-bottom-left-radius: 4px;
+            text-align: left;
+        }
+        .chat-input-row {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .chat-input {
+            flex: 1;
+            padding: 0.7rem 1rem;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 0.9rem;
+            outline: none;
+        }
+        .chat-input:focus { border-color: var(--lg-red); }
+
+        /* 차트 컨테이너 */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .chart-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.2rem;
+        }
+        .chart-card h3 { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 1rem; }
+        .chart-card canvas { width: 100% !important; }
+
+        /* 로딩 스피너 */
+        .spinner {
+            display: inline-block;
+            width: 20px; height: 20px;
+            border: 2px solid var(--border);
+            border-top-color: var(--lg-red);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 0.5rem;
+            vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* 반응형 */
+        @media (max-width: 768px) {
+            .charts-grid { grid-template-columns: 1fr; }
+            .header { flex-direction: column; gap: 1rem; }
+            .analysis-buttons { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><span>LG</span> 트윈스 AI 분석 대시보드</h1>
+        <div class="header-actions">
+            <button class="btn" onclick="refreshData()">데이터 새로고침</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 팀 요약 -->
+        <div class="team-overview" id="team-overview">
+            <div class="stat-card">
+                <div class="label">시즌</div>
+                <div class="value" id="stat-season">{{ team.season if team else '-' }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">현재 순위</div>
+                <div class="value rank" id="stat-rank">{{ team.rank if team and team.rank else '-' }}위</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">승</div>
+                <div class="value" id="stat-wins">{{ team.wins if team else 0 }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">패</div>
+                <div class="value red" id="stat-losses">{{ team.losses if team else 0 }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">무</div>
+                <div class="value" id="stat-draws">{{ team.draws if team else 0 }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">승률</div>
+                <div class="value" id="stat-winrate">
+                    {% if team and (team.wins + team.losses) > 0 %}
+                        {{ "%.3f"|format(team.wins / (team.wins + team.losses)) }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 탭 -->
+        <div class="tabs">
+            <button class="tab active" data-tab="stats">선수 성적</button>
+            <button class="tab" data-tab="charts">차트</button>
+            <button class="tab" data-tab="analysis">AI 분석</button>
+            <button class="tab" data-tab="chat">AI 채팅</button>
+        </div>
+
+        <!-- 선수 성적 탭 -->
+        <div class="tab-content active" id="tab-stats">
+            <h3 style="color:var(--text-dim); margin-bottom:1rem;">주요 타자</h3>
+            <div class="data-table-wrapper" style="margin-bottom:1.5rem; max-height:400px; overflow-y:auto;">
+                <table class="data-table" id="batter-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>선수명</th>
+                            <th>경기</th>
+                            <th>타율</th>
+                            <th>출루율</th>
+                            <th>장타율</th>
+                            <th>OPS</th>
+                            <th>홈런</th>
+                            <th>타점</th>
+                        </tr>
+                    </thead>
+                    <tbody id="batter-body"></tbody>
+                </table>
+            </div>
+
+            <h3 style="color:var(--text-dim); margin-bottom:1rem;">주요 투수</h3>
+            <div class="data-table-wrapper" style="max-height:400px; overflow-y:auto;">
+                <table class="data-table" id="pitcher-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>선수명</th>
+                            <th>경기</th>
+                            <th>승</th>
+                            <th>패</th>
+                            <th>ERA</th>
+                            <th>이닝</th>
+                            <th>탈삼진</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pitcher-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 차트 탭 -->
+        <div class="tab-content" id="tab-charts">
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3>타자 OPS 순위 (Top 10)</h3>
+                    <canvas id="opsChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>투수 ERA 비교 (주요 투수)</h3>
+                    <canvas id="eraChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>타자 홈런/타점</h3>
+                    <canvas id="hrRbiChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>투수 승/패</h3>
+                    <canvas id="winLossChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI 분석 탭 -->
+        <div class="tab-content" id="tab-analysis">
+            <div class="analysis-panel">
+                <h3>AI 분석 메뉴</h3>
+                <div class="analysis-buttons">
+                    <div class="analysis-btn" onclick="runAnalysis('power')">
+                        <div class="icon">📊</div>
+                        <div class="title">팀 전력 종합 분석</div>
+                        <div class="desc">공격력, 투수력, 핵심선수, 약점 등 종합 평가</div>
+                    </div>
+                    <div class="analysis-btn" onclick="runAnalysis('winloss')">
+                        <div class="icon">📈</div>
+                        <div class="title">승리/패배 요인 분석</div>
+                        <div class="desc">승리 패턴, 패배 패턴, 개선점 분석</div>
+                    </div>
+                    <div class="analysis-btn" onclick="runAnalysis('ranking')">
+                        <div class="icon">🏆</div>
+                        <div class="title">시즌 순위 전망</div>
+                        <div class="desc">최종 순위 예측, 포스트시즌 진출 가능성</div>
+                    </div>
+                    <div class="analysis-btn" onclick="runAnalysis('players')">
+                        <div class="icon">⭐</div>
+                        <div class="title">핵심 선수 분석</div>
+                        <div class="desc">키플레이어, 기대주, 부진선수 반등 가능성</div>
+                    </div>
+                </div>
+                <div class="analysis-result" id="analysis-result">
+                    분석 버튼을 클릭하면 AI가 LG 트윈스를 분석합니다.
+                </div>
+            </div>
+        </div>
+
+        <!-- AI 채팅 탭 -->
+        <div class="tab-content" id="tab-chat">
+            <div class="chat-section">
+                <h3>LG 트윈스 AI 상담</h3>
+                <div class="chat-messages" id="chat-messages">
+                    <div class="chat-msg assistant">
+                        <div class="bubble">안녕하세요! LG 트윈스에 대해 무엇이든 물어보세요.</div>
+                    </div>
+                </div>
+                <div class="chat-input-row">
+                    <input type="text" class="chat-input" id="chat-input"
+                           placeholder="질문을 입력하세요... (예: 올해 LG 선발 로테이션 전망은?)"
+                           onkeydown="if(event.key==='Enter') sendChat()">
+                    <button class="btn btn-primary" id="chat-send-btn" onclick="sendChat()">전송</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        // ── 탭 전환 ──
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+
+                if (tab.dataset.tab === 'charts' && !window._chartsRendered) {
+                    renderCharts();
+                }
+            });
+        });
+
+        // ── 데이터 로드 ──
+        let battersData = [];
+        let pitchersData = [];
+
+        async function loadData() {
+            try {
+                const [batRes, pitRes] = await Promise.all([
+                    fetch('/api/batters'),
+                    fetch('/api/pitchers'),
+                ]);
+                battersData = await batRes.json();
+                pitchersData = await pitRes.json();
+                renderBatters();
+                renderPitchers();
+            } catch (e) {
+                console.error('데이터 로드 실패:', e);
+            }
+        }
+
+        function renderBatters() {
+            const tbody = document.getElementById('batter-body');
+            tbody.innerHTML = battersData.map((b, i) => `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td class="player-name">${b.name}</td>
+                    <td>${b.games}</td>
+                    <td>${b.avg.toFixed(3)}</td>
+                    <td>${b.obp.toFixed(3)}</td>
+                    <td>${b.slg.toFixed(3)}</td>
+                    <td class="${b.ops >= 0.800 ? 'highlight' : ''}">${b.ops.toFixed(3)}
+                        <span class="ops-bar" style="width:${Math.min(b.ops * 80, 80)}px"></span>
+                    </td>
+                    <td>${b.hr}</td>
+                    <td>${b.rbi}</td>
+                </tr>
+            `).join('');
+        }
+
+        function renderPitchers() {
+            const tbody = document.getElementById('pitcher-body');
+            tbody.innerHTML = pitchersData.map((p, i) => `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td class="player-name">${p.name}</td>
+                    <td>${p.games}</td>
+                    <td>${p.wins}</td>
+                    <td>${p.losses}</td>
+                    <td class="${p.era <= 3.50 ? 'highlight' : ''}">${p.era.toFixed(2)}</td>
+                    <td>${p.innings.toFixed(1)}</td>
+                    <td>${p.strikeouts}</td>
+                </tr>
+            `).join('');
+        }
+
+        // ── 차트 ──
+        window._chartsRendered = false;
+
+        function renderCharts() {
+            if (battersData.length === 0 && pitchersData.length === 0) return;
+            window._chartsRendered = true;
+
+            const topBatters = battersData.slice(0, 10);
+            const topPitchers = pitchersData.slice(0, 10);
+
+            const chartColors = {
+                red: 'rgba(198, 12, 48, 0.8)',
+                green: 'rgba(100, 255, 218, 0.8)',
+                blue: 'rgba(15, 52, 96, 0.8)',
+                yellow: 'rgba(255, 217, 61, 0.8)',
+                redBg: 'rgba(198, 12, 48, 0.3)',
+                greenBg: 'rgba(100, 255, 218, 0.3)',
+            };
+
+            const defaultOptions = {
+                responsive: true,
+                plugins: { legend: { labels: { color: '#8892b0' } } },
+                scales: {
+                    x: { ticks: { color: '#8892b0' }, grid: { color: '#233554' } },
+                    y: { ticks: { color: '#8892b0' }, grid: { color: '#233554' } },
+                },
+            };
+
+            // OPS 차트
+            new Chart(document.getElementById('opsChart'), {
+                type: 'bar',
+                data: {
+                    labels: topBatters.map(b => b.name),
+                    datasets: [{
+                        label: 'OPS',
+                        data: topBatters.map(b => b.ops),
+                        backgroundColor: topBatters.map(b => b.ops >= 0.800 ? chartColors.green : chartColors.red),
+                        borderRadius: 4,
+                    }],
+                },
+                options: { ...defaultOptions, indexAxis: 'y' },
+            });
+
+            // ERA 차트
+            new Chart(document.getElementById('eraChart'), {
+                type: 'bar',
+                data: {
+                    labels: topPitchers.map(p => p.name),
+                    datasets: [{
+                        label: 'ERA',
+                        data: topPitchers.map(p => p.era),
+                        backgroundColor: topPitchers.map(p => p.era <= 3.5 ? chartColors.green : chartColors.red),
+                        borderRadius: 4,
+                    }],
+                },
+                options: defaultOptions,
+            });
+
+            // 홈런/타점 차트
+            new Chart(document.getElementById('hrRbiChart'), {
+                type: 'bar',
+                data: {
+                    labels: topBatters.map(b => b.name),
+                    datasets: [
+                        { label: '홈런', data: topBatters.map(b => b.hr), backgroundColor: chartColors.red, borderRadius: 4 },
+                        { label: '타점', data: topBatters.map(b => b.rbi), backgroundColor: chartColors.green, borderRadius: 4 },
+                    ],
+                },
+                options: defaultOptions,
+            });
+
+            // 승패 차트
+            new Chart(document.getElementById('winLossChart'), {
+                type: 'bar',
+                data: {
+                    labels: topPitchers.map(p => p.name),
+                    datasets: [
+                        { label: '승', data: topPitchers.map(p => p.wins), backgroundColor: chartColors.green, borderRadius: 4 },
+                        { label: '패', data: topPitchers.map(p => p.losses), backgroundColor: chartColors.red, borderRadius: 4 },
+                    ],
+                },
+                options: defaultOptions,
+            });
+        }
+
+        // ── AI 분석 ──
+        async function runAnalysis(type) {
+            const resultEl = document.getElementById('analysis-result');
+            resultEl.className = 'analysis-result loading';
+            resultEl.innerHTML = '<span class="spinner"></span> AI가 분석 중입니다... (최대 30초 소요)';
+
+            try {
+                const res = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type }),
+                });
+                const data = await res.json();
+                resultEl.className = 'analysis-result';
+                resultEl.textContent = data.result || data.error || '결과를 가져올 수 없습니다.';
+            } catch (e) {
+                resultEl.className = 'analysis-result';
+                resultEl.textContent = '오류가 발생했습니다: ' + e.message;
+            }
+        }
+
+        // ── 채팅 ──
+        async function sendChat() {
+            const input = document.getElementById('chat-input');
+            const btn = document.getElementById('chat-send-btn');
+            const question = input.value.trim();
+            if (!question) return;
+
+            const messages = document.getElementById('chat-messages');
+            messages.innerHTML += `<div class="chat-msg user"><div class="bubble">${escapeHtml(question)}</div></div>`;
+            input.value = '';
+            btn.disabled = true;
+
+            messages.innerHTML += `<div class="chat-msg assistant" id="typing"><div class="bubble"><span class="spinner"></span> 답변 생성 중...</div></div>`;
+            messages.scrollTop = messages.scrollHeight;
+
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question }),
+                });
+                const data = await res.json();
+                document.getElementById('typing').remove();
+                messages.innerHTML += `<div class="chat-msg assistant"><div class="bubble">${escapeHtml(data.result || data.error)}</div></div>`;
+            } catch (e) {
+                document.getElementById('typing').remove();
+                messages.innerHTML += `<div class="chat-msg assistant"><div class="bubble">오류: ${escapeHtml(e.message)}</div></div>`;
+            }
+
+            btn.disabled = false;
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // ── 데이터 새로고침 ──
+        async function refreshData() {
+            try {
+                await fetch('/api/refresh', { method: 'POST' });
+                location.reload();
+            } catch (e) {
+                alert('새로고침 실패: ' + e.message);
+            }
+        }
+
+        // ── 초기화 ──
+        loadData();
+    </script>
+</body>
+</html>

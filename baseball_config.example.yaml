@@ -1,0 +1,22 @@
+# LG 트윈스 AI 분석 에이전트 설정 파일
+# 이 파일을 baseball_config.yaml로 복사한 후 API 키를 설정하세요.
+
+# Anthropic API 키 (또는 ANTHROPIC_API_KEY 환경변수 사용)
+anthropic_api_key: "your-api-key-here"
+
+# 사용할 Claude 모델
+model: "claude-sonnet-4-6"
+
+# 분석 대상 팀
+kbo_team: "LG"
+
+# 시즌 연도
+season_year: 2026
+
+# 언어 설정
+language: "ko"
+
+# 데이터 소스 URL
+data_sources:
+  statiz_base_url: "https://statiz.sporki.com"
+  kbo_base_url: "https://www.koreabaseball.com"

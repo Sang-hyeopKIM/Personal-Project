@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>순서 맞추기 게임</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        h1 {
+            color: white;
+            font-size: 2.2rem;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            color: rgba(255,255,255,0.85);
+            font-size: 1rem;
+            margin-bottom: 30px;
+        }
+
+        .quiz-selector {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .quiz-btn {
+            padding: 10px 22px;
+            border: 2px solid rgba(255,255,255,0.5);
+            background: rgba(255,255,255,0.15);
+            color: white;
+            border-radius: 25px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.95rem;
+            font-weight: 700;
+            transition: all 0.3s;
+            backdrop-filter: blur(5px);
+        }
+
+        .quiz-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+
+        .quiz-btn.active {
+            background: white;
+            color: #764ba2;
+            border-color: white;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .game-container {
+            background: white;
+            border-radius: 24px;
+            padding: 40px;
+            width: 100%;
+            max-width: 700px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            position: relative;
+        }
+
+        .game-title {
+            font-size: 1.4rem;
+            font-weight: 900;
+            color: #333;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .game-description {
+            text-align: center;
+            color: #888;
+            font-size: 0.9rem;
+            margin-bottom: 30px;
+        }
+
+        .cards-area {
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 16px 20px;
+            background: #f8f9ff;
+            border: 2px solid #e8eaff;
+            border-radius: 14px;
+            cursor: grab;
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            user-select: none;
+            position: relative;
+        }
+
+        .card:active { cursor: grabbing; }
+
+        .card:hover {
+            border-color: #667eea;
+            background: #f0f2ff;
+            transform: translateX(5px);
+        }
+
+        .card.dragging {
+            opacity: 0.4;
+            transform: scale(0.95);
+        }
+
+        .card.drag-over {
+            border-color: #667eea;
+            background: #e8eaff;
+            transform: scale(1.02);
+        }
+
+        .card-number {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+        }
+
+        .card-text {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #333;
+            flex: 1;
+        }
+
+        .card-handle {
+            color: #ccc;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .card.correct {
+            border-color: #4CAF50;
+            background: #e8f5e9;
+            animation: cardCorrect 0.5s ease;
+        }
+
+        .card.correct .card-number {
+            background: linear-gradient(135deg, #4CAF50, #2E7D32);
+        }
+
+        .card.wrong {
+            border-color: #f44336;
+            background: #ffebee;
+            animation: cardWrong 0.5s ease;
+        }
+
+        .card.wrong .card-number {
+            background: linear-gradient(135deg, #f44336, #c62828);
+        }
+
+        @keyframes cardCorrect {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+        }
+
+        @keyframes cardWrong {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
+            20%, 40%, 60%, 80% { transform: translateX(8px); }
+        }
+
+        .button-area {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .play-btn {
+            padding: 16px 50px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-size: 1.1rem;
+            font-weight: 900;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .play-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+        }
+
+        .play-btn:active { transform: translateY(0); }
+
+        .reset-btn {
+            padding: 16px 30px;
+            background: #f5f5f5;
+            color: #666;
+            border: 2px solid #e0e0e0;
+            border-radius: 14px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .reset-btn:hover {
+            background: #eee;
+            transform: translateY(-3px);
+        }
+
+        .result-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .result-overlay.show {
+            display: flex;
+            animation: overlayIn 0.3s ease;
+        }
+
+        @keyframes overlayIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .result-box {
+            text-align: center;
+            padding: 50px 60px;
+            border-radius: 30px;
+            animation: resultPop 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        @keyframes resultPop {
+            from { transform: scale(0.5); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .result-box.success {
+            background: linear-gradient(135deg, #4CAF50, #2E7D32);
+            box-shadow: 0 20px 60px rgba(76, 175, 80, 0.4);
+        }
+
+        .result-box.fail {
+            background: linear-gradient(135deg, #f44336, #c62828);
+            box-shadow: 0 20px 60px rgba(244, 67, 54, 0.4);
+        }
+
+        .result-emoji {
+            font-size: 5rem;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .result-text {
+            color: white;
+            font-size: 1.8rem;
+            font-weight: 900;
+            margin-bottom: 8px;
+        }
+
+        .result-sub {
+            color: rgba(255,255,255,0.85);
+            font-size: 1rem;
+            margin-bottom: 25px;
+        }
+
+        .result-close-btn {
+            padding: 12px 35px;
+            background: rgba(255,255,255,0.25);
+            color: white;
+            border: 2px solid rgba(255,255,255,0.5);
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .result-close-btn:hover {
+            background: rgba(255,255,255,0.4);
+        }
+
+        .character-area {
+            text-align: center;
+            margin-bottom: 20px;
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .character {
+            font-size: 5rem;
+            transition: all 0.5s ease;
+            display: inline-block;
+        }
+
+        .character.idle { animation: idle 2s ease-in-out infinite; }
+        .character.happy { animation: happy 0.5s ease-in-out 3; }
+        .character.fall { animation: fall 0.8s ease-in forwards; }
+
+        @keyframes idle {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        @keyframes happy {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            25% { transform: translateY(-15px) rotate(-10deg); }
+            75% { transform: translateY(-15px) rotate(10deg); }
+        }
+
+        @keyframes fall {
+            0% { transform: rotate(0deg) translateY(0); }
+            30% { transform: rotate(-15deg) translateY(0); }
+            100% { transform: rotate(90deg) translateY(30px); opacity: 0.5; }
+        }
+
+        .score-area {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 20px;
+        }
+
+        .score-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+            color: white;
+            font-size: 1.1rem;
+        }
+
+        .score-icon { font-size: 1.3rem; }
+
+        .card.touch-dragging {
+            position: fixed;
+            z-index: 999;
+            opacity: 0.9;
+            transform: scale(1.05) rotate(2deg);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            pointer-events: none;
+            width: calc(100% - 80px);
+            max-width: 620px;
+        }
+
+        .card.placeholder {
+            opacity: 0.3;
+            border-style: dashed;
+        }
+
+        @media (max-width: 600px) {
+            h1 { font-size: 1.6rem; }
+            .game-container { padding: 24px 18px; }
+            .card { padding: 14px 16px; }
+            .card-text { font-size: 0.95rem; }
+            .play-btn, .reset-btn { padding: 14px 28px; font-size: 1rem; }
+            .result-box { padding: 40px 30px; }
+            .result-text { font-size: 1.4rem; }
+        }
+    </style>
+</head>
+<body>
+    <h1>순서 맞추기 게임</h1>
+    <p class="subtitle">카드를 올바른 순서로 나열한 후 플레이 버튼을 눌러보세요!</p>
+
+    <div class="score-area">
+        <div class="score-item">
+            <span class="score-icon">&#11088;</span>
+            <span>정답: <span id="correctCount">0</span></span>
+        </div>
+        <div class="score-item">
+            <span class="score-icon">&#10060;</span>
+            <span>오답: <span id="wrongCount">0</span></span>
+        </div>
+    </div>
+
+    <div class="quiz-selector" id="quizSelector"></div>
+
+    <div class="game-container">
+        <div class="character-area">
+            <div class="character idle" id="character">&#128566;</div>
+        </div>
+
+        <h2 class="game-title" id="gameTitle">물 마시기</h2>
+        <p class="game-description" id="gameDescription">물을 마시는 올바른 순서를 맞춰보세요!</p>
+
+        <div class="cards-area" id="cardsArea"></div>
+
+        <div class="button-area">
+            <button class="reset-btn" onclick="shuffleCards()">&#128260; 섞기</button>
+            <button class="play-btn" onclick="checkAnswer()">&#9654; 플레이</button>
+        </div>
+    </div>
+
+    <div class="result-overlay" id="resultOverlay">
+        <div class="result-box" id="resultBox">
+            <span class="result-emoji" id="resultEmoji"></span>
+            <div class="result-text" id="resultText"></div>
+            <div class="result-sub" id="resultSub"></div>
+            <button class="result-close-btn" onclick="closeResult()">확인</button>
+        </div>
+    </div>
+
+    <script>
+        const quizzes = [
+            {
+                title: "물 마시기",
+                description: "물을 마시는 올바른 순서를 맞춰보세요!",
+                emoji: "&#128167;",
+                steps: ["정수기를 찾는다", "컵을 든다", "물을 따른다", "물을 마신다"]
+            },
+            {
+                title: "라면 끓이기",
+                description: "라면을 끓이는 올바른 순서를 맞춰보세요!",
+                emoji: "&#127836;",
+                steps: ["냄비에 물을 넣는다", "물을 끓인다", "면과 스프를 넣는다", "면이 익을 때까지 기다린다", "그릇에 담아 먹는다"]
+            },
+            {
+                title: "손 씻기",
+                description: "손을 씻는 올바른 순서를 맞춰보세요!",
+                emoji: "&#129532;",
+                steps: ["수도꼭지를 연다", "손에 물을 적신다", "비누를 묻힌다", "거품을 내며 손을 문지른다", "물로 헹군다", "수건으로 닦는다"]
+            },
+            {
+                title: "학교 가기",
+                description: "학교에 가는 올바른 순서를 맞춰보세요!",
+                emoji: "&#127979;",
+                steps: ["알람 소리에 일어난다", "세수하고 양치질한다", "교복을 입는다", "아침밥을 먹는다", "가방을 챙긴다", "집을 나선다", "학교에 도착한다"]
+            },
+            {
+                title: "양치질하기",
+                description: "양치질하는 올바른 순서를 맞춰보세요!",
+                emoji: "&#129463;",
+                steps: ["칫솔을 꺼낸다", "치약을 짠다", "칫솔에 물을 묻힌다", "이를 닦는다", "물로 입을 헹군다", "칫솔을 씻어 정리한다"]
+            }
+        ];
+
+        let currentQuiz = 0;
+        let correctCount = 0;
+        let wrongCount = 0;
+        let draggedCard = null;
+        let touchStartY = 0;
+        let touchCard = null;
+        let touchPlaceholder = null;
+
+        function renderQuizSelector() {
+            const selector = document.getElementById('quizSelector');
+            selector.innerHTML = '';
+            quizzes.forEach((quiz, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'quiz-btn' + (index === currentQuiz ? ' active' : '');
+                btn.innerHTML = quiz.emoji + ' ' + quiz.title;
+                btn.onclick = () => selectQuiz(index);
+                selector.appendChild(btn);
+            });
+        }
+
+        function selectQuiz(index) {
+            currentQuiz = index;
+            renderQuizSelector();
+            resetCharacter();
+            renderCards();
+        }
+
+        function renderCards() {
+            const quiz = quizzes[currentQuiz];
+            document.getElementById('gameTitle').textContent = quiz.title;
+            document.getElementById('gameDescription').textContent = quiz.description;
+            const shuffled = [...quiz.steps];
+            shuffleArray(shuffled);
+            buildCards(shuffled);
+        }
+
+        function buildCards(steps) {
+            const area = document.getElementById('cardsArea');
+            area.innerHTML = '';
+            steps.forEach((step, index) => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.draggable = true;
+                card.dataset.text = step;
+                card.innerHTML = '<div class="card-number">' + (index + 1) + '</div><div class="card-text">' + step + '</div><div class="card-handle">&#9776;</div>';
+                card.addEventListener('dragstart', handleDragStart);
+                card.addEventListener('dragend', handleDragEnd);
+                card.addEventListener('dragover', handleDragOver);
+                card.addEventListener('dragenter', handleDragEnter);
+                card.addEventListener('dragleave', handleDragLeave);
+                card.addEventListener('drop', handleDrop);
+                card.addEventListener('touchstart', handleTouchStart, { passive: false });
+                card.addEventListener('touchmove', handleTouchMove, { passive: false });
+                card.addEventListener('touchend', handleTouchEnd);
+                area.appendChild(card);
+            });
+        }
+
+        function updateCardNumbers() {
+            const cards = document.querySelectorAll('#cardsArea .card:not(.placeholder)');
+            cards.forEach((card, index) => {
+                card.querySelector('.card-number').textContent = index + 1;
+            });
+        }
+
+        function handleDragStart(e) {
+            draggedCard = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleDragEnd() {
+            this.classList.remove('dragging');
+            document.querySelectorAll('.card').forEach(c => c.classList.remove('drag-over'));
+            draggedCard = null;
+            updateCardNumbers();
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
+
+        function handleDragEnter(e) {
+            e.preventDefault();
+            if (this !== draggedCard) this.classList.add('drag-over');
+        }
+
+        function handleDragLeave() { this.classList.remove('drag-over'); }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+            if (this !== draggedCard && draggedCard) {
+                const area = document.getElementById('cardsArea');
+                const cards = [...area.querySelectorAll('.card')];
+                const fromIndex = cards.indexOf(draggedCard);
+                const toIndex = cards.indexOf(this);
+                if (fromIndex < toIndex) {
+                    area.insertBefore(draggedCard, this.nextSibling);
+                } else {
+                    area.insertBefore(draggedCard, this);
+                }
+                updateCardNumbers();
+            }
+        }
+
+        function handleTouchStart(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            touchCard = this;
+            touchStartY = touch.clientY;
+            const rect = this.getBoundingClientRect();
+            touchPlaceholder = document.createElement('div');
+            touchPlaceholder.className = 'card placeholder';
+            touchPlaceholder.style.height = rect.height + 'px';
+            this.parentNode.insertBefore(touchPlaceholder, this);
+            this.classList.add('touch-dragging');
+            this.style.left = rect.left + 'px';
+            this.style.top = rect.top + 'px';
+            this.style.width = rect.width + 'px';
+            document.body.appendChild(this);
+        }
+
+        function handleTouchMove(e) {
+            e.preventDefault();
+            if (!touchCard) return;
+            const touch = e.touches[0];
+            const rect = touchCard.getBoundingClientRect();
+            touchCard.style.top = (touch.clientY - rect.height / 2) + 'px';
+            const area = document.getElementById('cardsArea');
+            const cards = [...area.querySelectorAll('.card:not(.placeholder)')];
+            cards.forEach(card => {
+                if (card === touchCard) return;
+                const cardRect = card.getBoundingClientRect();
+                const cardCenter = cardRect.top + cardRect.height / 2;
+                if (touch.clientY > cardRect.top && touch.clientY < cardRect.bottom) {
+                    if (touch.clientY < cardCenter) {
+                        area.insertBefore(touchPlaceholder, card);
+                    } else {
+                        area.insertBefore(touchPlaceholder, card.nextSibling);
+                    }
+                }
+            });
+        }
+
+        function handleTouchEnd(e) {
+            if (!touchCard || !touchPlaceholder) return;
+            touchCard.classList.remove('touch-dragging');
+            touchCard.style.position = '';
+            touchCard.style.left = '';
+            touchCard.style.top = '';
+            touchCard.style.width = '';
+            touchCard.style.zIndex = '';
+            const area = document.getElementById('cardsArea');
+            area.insertBefore(touchCard, touchPlaceholder);
+            touchPlaceholder.remove();
+            touchCard = null;
+            touchPlaceholder = null;
+            updateCardNumbers();
+        }
+
+        function shuffleArray(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        function shuffleCards() {
+            resetCharacter();
+            document.querySelectorAll('.card').forEach(c => { c.classList.remove('correct', 'wrong'); });
+            renderCards();
+        }
+
+        function checkAnswer() {
+            const quiz = quizzes[currentQuiz];
+            const cards = document.querySelectorAll('#cardsArea .card');
+            const userOrder = [...cards].map(c => c.dataset.text);
+            let allCorrect = true;
+            cards.forEach((card, index) => {
+                card.classList.remove('correct', 'wrong');
+                if (userOrder[index] === quiz.steps[index]) {
+                    setTimeout(() => card.classList.add('correct'), index * 100);
+                } else {
+                    allCorrect = false;
+                    setTimeout(() => card.classList.add('wrong'), index * 100);
+                }
+            });
+            const delay = cards.length * 100 + 300;
+            if (allCorrect) {
+                correctCount++;
+                document.getElementById('correctCount').textContent = correctCount;
+                setTimeout(() => showSuccess(), delay);
+            } else {
+                wrongCount++;
+                document.getElementById('wrongCount').textContent = wrongCount;
+                setTimeout(() => showFail(), delay);
+            }
+        }
+
+        function resetCharacter() {
+            const c = document.getElementById('character');
+            c.className = 'character idle';
+            c.innerHTML = '&#128566;';
+        }
+
+        function showSuccess() {
+            const c = document.getElementById('character');
+            c.className = 'character happy';
+            c.innerHTML = '&#128515;';
+            showOverlay(true);
+        }
+
+        function showFail() {
+            const c = document.getElementById('character');
+            c.className = 'character fall';
+            c.innerHTML = '&#128565;';
+            showOverlay(false);
+        }
+
+        function showOverlay(success) {
+            const overlay = document.getElementById('resultOverlay');
+            const box = document.getElementById('resultBox');
+            const emoji = document.getElementById('resultEmoji');
+            const text = document.getElementById('resultText');
+            const sub = document.getElementById('resultSub');
+            if (success) {
+                box.className = 'result-box success';
+                emoji.innerHTML = '&#127881;';
+                text.textContent = '정답입니다!';
+                sub.textContent = '완벽한 순서예요! 대단해요!';
+            } else {
+                box.className = 'result-box fail';
+                emoji.innerHTML = '&#128557;';
+                text.textContent = '순서가 틀렸어요!';
+                sub.textContent = '캐릭터가 쓰러졌어요... 다시 도전해보세요!';
+            }
+            overlay.classList.add('show');
+        }
+
+        function closeResult() {
+            document.getElementById('resultOverlay').classList.remove('show');
+        }
+
+        document.getElementById('resultOverlay').addEventListener('click', function(e) {
+            if (e.target === this) closeResult();
+        });
+
+        renderQuizSelector();
+        renderCards();
+    </script>
+</body>
+</html>
